@@ -80,11 +80,11 @@
       <main class="workspace">
         <div class="workspace-heading">
           <div><div class="section-label">YOUR CANVAS</div><div class="workspace-frame-title">Frame <span id="currentFrameNum">01</span><span class="muted"> / </span><span id="totalFrames">01</span></div></div>
-          <div class="canvas-meta"><span class="canvas-live"><span class="live-dot"></span> Everyone can draw</span><span class="resolution">960 × 540</span></div>
+          <div class="canvas-meta"><span class="canvas-live"><span class="live-dot"></span> Everyone can draw</span><span class="resolution" id="canvasResolution">960 × 540</span></div>
         </div>
         <div class="stage" id="stage">
           <div class="stage-ambient"></div>
-          <div class="artboard-wrap"><canvas id="drawCanvas" width="960" height="540" aria-label="Drawing canvas: draw with mouse, stylus, or touch"></canvas></div>
+          <div class="artboard-wrap" id="artboardWrap"><canvas id="drawCanvas" width="960" height="540" aria-label="Drawing canvas: draw with mouse, stylus, or touch"></canvas></div>
           <div class="stage-bottom-note"><svg class="ui-icon"><use href="#i-sparkles"/></svg><span>Draw something wonderful</span></div>
         </div>
         <div class="playback-bar">
@@ -100,8 +100,25 @@
       </main>
 
       <aside class="right-sidebar">
-        <div class="right-heading">Animation <span class="right-heading-icon">✧</span></div>
-        <p class="right-description">Your story, one frame at a time.</p>
+        <div class="section-label">CANVAS SIZE</div>
+        <label class="canvas-size-label" for="canvasPreset">Resolution</label>
+        <select id="canvasPreset" class="canvas-preset" aria-label="Canvas size preset">
+          <option value="960x540">960 × 540 · 16:9</option>
+          <option value="1280x720">1280 × 720 · HD</option>
+          <option value="1920x1080">1920 × 1080 · Full HD</option>
+          <option value="800x600">800 × 600 · 4:3</option>
+          <option value="800x800">800 × 800 · Square</option>
+          <option value="1080x1080">1080 × 1080 · Square HD</option>
+          <option value="720x1280">720 × 1280 · Vertical</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <div id="customCanvasSize" class="canvas-size-fields" hidden>
+          <label for="canvasWidth">Width <input id="canvasWidth" type="number" min="128" max="1920" step="1" inputmode="numeric" value="960" /></label>
+          <span aria-hidden="true">×</span>
+          <label for="canvasHeight">Height <input id="canvasHeight" type="number" min="128" max="1920" step="1" inputmode="numeric" value="540" /></label>
+        </div>
+        <button id="applyCanvasSize" class="button button-secondary canvas-size-apply" disabled>Apply canvas size</button>
+        <p class="canvas-size-hint">All frames resize together. Artwork scales proportionally to fit without stretching. Shared with collaborators.</p>
         <div class="sidebar-rule"></div>
         <div class="setting-row"><div><div class="setting-name">Onion skin</div><div class="setting-desc">See your previous frame</div></div><label class="switch" title="Show previous frame faintly"><input id="onionToggle" type="checkbox" checked /><span class="switch-track"></span></label></div>
         <div class="onion-controls"><label class="setting-row compact-setting">Previous frames <select id="onionPrev" aria-label="Previous onion frames"><option>0</option><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label><label class="setting-row compact-setting">Next frames <select id="onionNext" aria-label="Next onion frames"><option selected>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
@@ -113,8 +130,6 @@
         <div id="curveEditor" class="curve-editor"><svg id="curvePreview" viewBox="0 0 160 100" aria-label="Motion easing curve preview"></svg><label>First handle Y <input id="curveY1" type="range" min="0" max="1" step="0.05" value="0"/></label><label>Second handle Y <input id="curveY2" type="range" min="0" max="1" step="0.05" value="1"/></label><label>First handle X <input id="curveX1" type="range" min="0" max="1" step="0.05" value="0.42"/></label><label>Second handle X <input id="curveX2" type="range" min="0" max="1" step="0.05" value="0.58"/></label></div>
         <button id="tweenBtn" class="button button-secondary tween-button">Generate in-betweens</button>
         <div class="sidebar-rule"></div>
-        <div class="section-label">HOW IT WORKS</div>
-        <div class="guide-steps"><div class="guide-step"><span>01</span><p>Draw something on your canvas.</p></div><div class="guide-step"><span>02</span><p>Add a frame, then move your drawing a little.</p></div><div class="guide-step"><span>03</span><p>Hit play and watch it come to life!</p></div></div>
         <div class="invite-card"><div class="invite-card-graphic"><span>✎</span><span>✦</span><span>◡</span></div><div class="invite-card-title">Better together.</div><p>Invite friends to draw in this flipbook with you, in real time.</p><button id="sideInviteBtn">Copy invite link <span>↗</span></button></div>
         <div class="sidebar-footer">MADE FOR CREATIVE MINDS <span>✦</span></div>
       </aside>

@@ -26,7 +26,7 @@ const imageDataRe = /^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/;
 function projectFile(id) { return path.join(DATA,`${id}.json`); }
 function load(id) {
   if (projects.has(id)) return projects.get(id);
-  try { const p=JSON.parse(fs.readFileSync(projectFile(id),'utf8')); if (!Array.isArray(p.frames)) return null; projects.set(id,p); return p; } catch { return null; }
+  try { const p=JSON.parse(fs.readFileSync(projectFile(id),'utf8')); if (!Array.isArray(p.frames)) return null; p.width=p.width||960;p.height=p.height||540; projects.set(id,p); return p; } catch { return null; }
 }
 function save(p) {
   // Synchronous atomic replacement: all operations in this single process remain ordered.
@@ -39,23 +39,23 @@ function presence(id) {
   const clients=[...(streams.get(id)||[])].map(c=>({id:c.id,name:c.name,color:c.color}));
   broadcast(id,'presence',{clients});
 }
-function normalizeStroke(input) {
+function normalizeStroke(input,p) {
   if (!input || !isId(input.id)) return null;
   const opacity=limit(input.opacity??1,0.001,1);
   if (input.kind==='image') {
     if (typeof input.src!=='string'||input.src.length>MAX_IMAGE_DATA||!imageDataRe.test(input.src)) return null;
-    return {id:input.id,kind:'image',role:input.role==='fill'?'fill':'image',src:input.src,x:limit(input.x??0,0,960),y:limit(input.y??0,0,540),w:limit(input.w??960,1,1920),h:limit(input.h??540,1,1080),opacity};
+    return {id:input.id,kind:'image',role:input.role==='fill'?'fill':'image',src:input.src,x:limit(input.x??0,0,p.width),y:limit(input.y??0,0,p.height),w:limit(input.w??p.width,1,p.width*2),h:limit(input.h??p.height,1,p.height*2),opacity};
   }
   if (!['pen','eraser'].includes(input.tool)) return null;
   if (!Array.isArray(input.points) || !input.points.length || input.points.length>2000) return null;
-  const points = input.points.map(p => [Math.round(limit(p[0],0,960)*10)/10,Math.round(limit(p[1],0,540)*10)/10]);
+  const points = input.points.map(pt => [Math.round(limit(pt[0],0,p.width)*10)/10,Math.round(limit(pt[1],0,p.height)*10)/10]);
   const color = /^#[a-fA-F0-9]{6}$/.test(input.color) ? input.color : '#26223b';
   return {id:input.id,tool:input.tool,color,size:limit(input.size,1,80),points,opacity};
 }
-function normalizeFrame(input) {
+function normalizeFrame(input,p) {
   if (!input || !isId(input.id) || !Array.isArray(input.strokes) || input.strokes.length>2000) return null;
   const strokes=[];
-  for (const item of input.strokes) { const stroke=normalizeStroke(item); if (!stroke) return null; strokes.push(stroke); }
+  for (const item of input.strokes) { const stroke=normalizeStroke(item,p); if (!stroke) return null; strokes.push(stroke); }
   return {id:input.id,strokes};
 }
 function operate(p,op) {
@@ -63,13 +63,13 @@ function operate(p,op) {
   const idx=p.frames.findIndex(f=>f.id===op.frameId);
   switch(op.type) {
     case 'stroke-add': {
-      const stroke=normalizeStroke(op.stroke);
+      const stroke=normalizeStroke(op.stroke,p);
       if (idx<0 || !stroke || p.frames[idx].strokes.length>=2000) return {error:'Invalid stroke'};
       if (p.frames[idx].strokes.some(s=>s.id===stroke.id)) return {error:'Duplicate stroke'};
       p.frames[idx].strokes.push(stroke); return {type:'stroke-add',frameId:op.frameId,stroke};
     }
     case 'stroke-insert': {
-      const stroke=normalizeStroke(op.stroke);
+      const stroke=normalizeStroke(op.stroke,p);
       if(idx<0 || !stroke || p.frames[idx].strokes.length>=2000 || p.frames[idx].strokes.some(s=>s.id===stroke.id)) return {error:'Invalid stroke insertion'};
       const at=Math.max(0,Math.min(p.frames[idx].strokes.length,Math.floor(Number(op.index)||0)));
       p.frames[idx].strokes.splice(at,0,stroke);return {type:'stroke-insert',frameId:op.frameId,stroke,index:at};
@@ -78,7 +78,7 @@ function operate(p,op) {
       if(idx<0 || !Array.isArray(op.strokes) || !op.strokes.length || op.strokes.length>2000) return {error:'Invalid stroke update'};
       const updates=[];
       for(const item of op.strokes) {
-        const stroke=normalizeStroke(item);
+        const stroke=normalizeStroke(item,p);
         if(!stroke || !p.frames[idx].strokes.some(s=>s.id===stroke.id) || updates.some(s=>s.id===stroke.id)) return {error:'Unknown stroke in batch'};
         updates.push(stroke);
       }
@@ -90,13 +90,13 @@ function operate(p,op) {
     }
     case 'frame-replace': {
       if(idx<0 || !Array.isArray(op.strokes) || op.strokes.length>2000) return {error:'Invalid frame replacement'};
-      const all=op.strokes.map(normalizeStroke);
+      const all=op.strokes.map(s=>normalizeStroke(s,p));
       if(all.some(s=>!s))return {error:'Invalid frame content'};
       p.frames[idx].strokes=all;return {type:'frame-replace',frameId:op.frameId,strokes:all};
     }
     case 'frame-insert-batch': {
       if(!Array.isArray(op.frames)||!op.frames.length||op.frames.length>24||p.frames.length+op.frames.length>120) return {error:'Too many tween frames'};
-      const frames=op.frames.map(normalizeFrame);
+      const frames=op.frames.map(f=>normalizeFrame(f,p));
       if(frames.some(f=>!f)||new Set(frames.map(f=>f.id)).size!==frames.length||frames.some(f=>p.frames.some(ex=>ex.id===f.id)))return {error:'Invalid tween frames'};
       const at=p.frames.findIndex(f=>f.id===op.afterId);
       p.frames.splice(at<0?p.frames.length:at+1,0,...frames);
@@ -115,7 +115,7 @@ function operate(p,op) {
       p.frames[idx].strokes.splice(i,1); return {type:'stroke-remove',frameId:op.frameId,strokeId:op.strokeId};
     }
     case 'frame-add': {
-      const frame=normalizeFrame(op.frame);
+      const frame=normalizeFrame(op.frame,p);
       if(!frame || p.frames.length>=120 || p.frames.some(f=>f.id===frame.id)) return {error:'Invalid new frame'};
       const after=p.frames.findIndex(f=>f.id===op.afterId);
       p.frames.splice(after<0?p.frames.length:after+1,0,frame);
@@ -134,6 +134,27 @@ function operate(p,op) {
     case 'frame-clear': {
       if(idx<0) return {error:'Frame not found'};
       p.frames[idx].strokes=[]; return {type:'frame-clear',frameId:op.frameId};
+    }
+    case 'canvas-resize': {
+      const width=Number(op.width),height=Number(op.height);
+      if(!Number.isInteger(width)||!Number.isInteger(height)||width<128||height<128||width>1920||height>1920)return {error:'Canvas dimensions must be between 128 and 1920 pixels'};
+      const oldWidth=p.width,oldHeight=p.height;
+      if(oldWidth===width && oldHeight===height)return {type:'canvas-resize',oldWidth,oldHeight,width,height};
+      const scale=Math.min(width/oldWidth,height/oldHeight),offsetX=(width-oldWidth*scale)/2,offsetY=(height-oldHeight*scale)/2;
+      const round=n=>Math.round(n*10)/10;
+      for(const frame of p.frames){
+        for(const stroke of frame.strokes){
+          if(stroke.kind==='image'){
+            stroke.x=round(stroke.x*scale+offsetX);stroke.y=round(stroke.y*scale+offsetY);
+            stroke.w=round(stroke.w*scale);stroke.h=round(stroke.h*scale);
+          }else{
+            stroke.size=Math.min(80,Math.max(1,Math.round(stroke.size*scale*100)/100));
+            stroke.points=stroke.points.map(([x,y])=>[round(x*scale+offsetX),round(y*scale+offsetY)]);
+          }
+        }
+      }
+      p.width=width;p.height=height;
+      return {type:'canvas-resize',oldWidth,oldHeight,width,height};
     }
     case 'fps-set': p.fps=Math.round(limit(op.fps,1,24)); return {type:'fps-set',fps:p.fps};
     case 'title-set': p.title=str(op.title,80).trim()||'Untitled animation'; return {type:'title-set',title:p.title};
@@ -196,7 +217,7 @@ const server=http.createServer(async(req,res)=>{
       if(action==='draft' && req.method==='POST') {
         const b=await readBody(req,16000);
         if(!isId(b.frameId))return json(res,400,{error:'Invalid frame'});
-        const points=Array.isArray(b.points)?b.points.slice(-120).map(pt=>[limit(pt[0],0,960),limit(pt[1],0,540)]):[];
+        const points=Array.isArray(b.points)?b.points.slice(-120).map(pt=>[limit(pt[0],0,p.width),limit(pt[1],0,p.height)]):[];
         const tool=['pen','eraser'].includes(b.tool)?b.tool:'pen';
         broadcast(id,'draft',{clientId:str(b.clientId,60),frameId:b.frameId,points,tool,size:limit(b.size,1,80),color:/^#[a-fA-F0-9]{6}$/.test(b.color)?b.color:'#222222',end:!!b.end});
         return json(res,200,{ok:true});

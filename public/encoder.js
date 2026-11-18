@@ -40,8 +40,13 @@
     chunks.push(0);
     return Uint8Array.from(chunks);
   }
+  function scaledSize(paint,maxSide){
+    const size=paint.canvasSize||{width:960,height:540};
+    const scale=Math.min(1,maxSide/Math.max(size.width,size.height));
+    return {w:Math.max(1,Math.round(size.width*scale)),h:Math.max(1,Math.round(size.height*scale))};
+  }
   async function gif(frames,fps,paint,progress){
-    const w=480,h=270,canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+    const {w,h}=scaledSize(paint,480),canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
     const ctx=canvas.getContext('2d',{willReadFrequently:true});
     const delay=Math.max(2,Math.round(100/fps));
     const header=new Uint8Array(13);header.set(ascii('GIF89a'));
@@ -76,10 +81,11 @@
     return new Blob([...parts,...central,end],{type:'application/zip'});
   }
   async function zipPng(frames,paint,progress){
-    const canvas=document.createElement('canvas');canvas.width=960;canvas.height=540;
+    const size=paint.canvasSize||{width:960,height:540};
+    const canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;
     const ctx=canvas.getContext('2d');const entries=[];
     for(let i=0;i<frames.length;i++){
-      paint(ctx,frames[i],960,540);
+      paint(ctx,frames[i],size.width,size.height);
       const bytes=new Uint8Array(await (await canvasBlob(canvas)).arrayBuffer());
       entries.push({name:`frame_${String(i+1).padStart(4,'0')}.png`,bytes});
       progress(Math.round((i+1)*100/frames.length));await pause();
@@ -87,7 +93,7 @@
     return zip(entries);
   }
   async function sheet(frames,paint,progress){
-    const w=480,h=270,columns=Math.min(8,Math.ceil(Math.sqrt(frames.length))),rows=Math.ceil(frames.length/columns);
+    const {w,h}=scaledSize(paint,480),columns=Math.min(8,Math.ceil(Math.sqrt(frames.length))),rows=Math.ceil(frames.length/columns);
     const canvas=document.createElement('canvas');canvas.width=w*columns;canvas.height=h*rows;
     const ctx=canvas.getContext('2d');
     const thumb=document.createElement('canvas');thumb.width=w;thumb.height=h;const t=thumb.getContext('2d');

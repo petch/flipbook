@@ -1,4 +1,4 @@
-# Flipbook Studio 2
+# Flipbook Studio 3
 
 A dependency-free Node.js website for collaborative, frame-by-frame 2D animation. Works with mouse, stylus, or touch. Projects are shared by URL and automatically saved locally as JSON.
 
@@ -20,6 +20,10 @@ Open **http://localhost:3000**. Create a project and share its URL. For a differ
 4. Visit the public `*.onrender.com` URL and share the project link.
 
 **Data warning:** Render Free has an ephemeral filesystem. `data/*.json` files **can be lost on idle shutdowns, redeployments, and restarts**. This edition is suitable for temporary experiments, not persistent shared projects on Render Free. For permanent hosting, add an external database or storage service. Export before leaving your work unattended.
+
+## Canvas size
+
+Choose **Canvas Size** in the right sidebar (presets for landscape, portrait, square, and **Custom**). Custom dimensions range from **128–1920 px** for each side. Click **Apply canvas size**; changing size updates every animation frame for all collaborators. Existing strokes and embedded images are scaled proportionally and centered so changing aspect ratio adds blank margins instead of stretching drawings. This operation intentionally resets local undo/redo history, because prior coordinates no longer match the new canvas. Export sizes follow the chosen project resolution (except GIF and sprite sheets, which scale to a maximum of 480 pixels on their longest side).
 
 ## Editing features
 
@@ -43,11 +47,11 @@ Select a format in the top-right dropdown, then click **Export**:
 
 | Format | Notes |
 |---|---|
-| WebM | 960×540, browser MediaRecorder, Chrome/Edge recommended |
-| MP4 | 960×540, **only if the browser supports MP4 MediaRecorder** |
-| Animated GIF | 480×270, 256-color palette, loops |
-| PNG sequence ZIP | Separate full-resolution 960×540 PNG per frame |
-| PNG sprite sheet | 480×270 per frame in a packed grid |
+| WebM | Chosen canvas resolution, browser MediaRecorder, Chrome/Edge recommended |
+| MP4 | Chosen canvas resolution, **only if the browser supports MP4 MediaRecorder** |
+| Animated GIF | Proportional scaling, maximum longest side 480 px, 256-color palette, loops |
+| PNG sequence ZIP | Separate full-resolution PNG per frame |
+| PNG sprite sheet | Proportionally resized tiles (longest side up to 480 px) in a packed grid |
 
 Video recordings are made in **real time**, and very short animations repeat to reach approximately 1.5 seconds. Exporting is performed locally in your browser. Audio is not included. Large animations and GIF export consume memory and may take longer.
 

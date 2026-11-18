@@ -21,10 +21,12 @@
   let undoStack=[],redoStack=[],historyBusy=false;
   const touchPointers=new Map();let touchGesture=null;
   const imageCache=new Map();
-  let toastTimeout=0, draggedId=null;
+  let toastTimeout=0, draggedId=null, renderedCanvasSize='';
   const remoteDrafts=new Map();
   const drawCanvas=$('drawCanvas'), drawCtx=drawCanvas.getContext('2d');
   const scratch=document.createElement('canvas');scratch.width=960;scratch.height=540;
+  const canvasSizePresets=['960x540','1280x720','1920x1080','800x600','800x800','1080x1080','720x1280'];
+  const dimensions=()=>({width:project?.width||960,height:project?.height||540});
   const scratchCtx=scratch.getContext('2d');
 
   function toast(msg) {
@@ -81,17 +83,69 @@
     else{ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.stroke();}
     ctx.restore();
   }
-  function paintFrameOn(ctx,frame,width=960,height=540,{drafts=[],background='#ffffff'}={}) {
+  function paintFrameOn(ctx,frame,width=dimensions().width,height=dimensions().height,{drafts=[],background='#ffffff'}={}) {
     ctx.save();ctx.clearRect(0,0,width,height);ctx.fillStyle=background;ctx.fillRect(0,0,width,height);
     const layer=document.createElement('canvas');layer.width=width;layer.height=height;
-    const layerCtx=layer.getContext('2d');layerCtx.scale(width/960,height/540);
+    const layerCtx=layer.getContext('2d');layerCtx.scale(width/dimensions().width,height/dimensions().height);
     for(const stroke of (frame?.strokes||[]))paintPath(layerCtx,stroke);
     for(const draft of drafts)paintPath(layerCtx,draft);
     ctx.drawImage(layer,0,0);ctx.restore();
   }
   function moveStroke(stroke,dx,dy){
-    if(stroke.kind==='image')return {...stroke,x:Math.max(0,Math.min(960,stroke.x+dx)),y:Math.max(0,Math.min(540,stroke.y+dy))};
-    return {...stroke,points:stroke.points.map(p=>[Math.max(0,Math.min(960,p[0]+dx)),Math.max(0,Math.min(540,p[1]+dy))])};
+    const {width,height}=dimensions();
+    if(stroke.kind==='image')return {...stroke,x:Math.max(0,Math.min(width,stroke.x+dx)),y:Math.max(0,Math.min(height,stroke.y+dy))};
+    return {...stroke,points:stroke.points.map(p=>[Math.max(0,Math.min(width,p[0]+dx)),Math.max(0,Math.min(height,p[1]+dy))])};
+  }
+  function resizeStroke(stroke,oldWidth,oldHeight,newWidth,newHeight){
+    const scale=Math.min(newWidth/oldWidth,newHeight/oldHeight);
+    const offsetX=(newWidth-oldWidth*scale)/2,offsetY=(newHeight-oldHeight*scale)/2;
+    const round=n=>Math.round(n*10)/10;
+    if(stroke.kind==='image')return {...stroke,x:round(stroke.x*scale+offsetX),y:round(stroke.y*scale+offsetY),w:round(stroke.w*scale),h:round(stroke.h*scale)};
+    return {...stroke,size:Math.min(80,Math.max(1,Math.round(stroke.size*scale*100)/100)),points:stroke.points.map(([x,y])=>[round(x*scale+offsetX),round(y*scale+offsetY)])};
+  }
+  function updateCanvasDimensions(){
+    if(!project)return;
+    const {width,height}=dimensions();
+    if(drawCanvas.width!==width || drawCanvas.height!==height){drawCanvas.width=width;drawCanvas.height=height;}
+    if(scratch.width!==width || scratch.height!==height){scratch.width=width;scratch.height=height;}
+    $('artboardWrap').style.setProperty('--canvas-aspect',String(width/height));
+    $('canvasResolution').textContent=`${width} × ${height}`;
+    const key=`${width}x${height}`;
+    if(key!==renderedCanvasSize){
+      renderedCanvasSize=key;
+      $('canvasWidth').value=width;$('canvasHeight').value=height;
+      $('canvasPreset').value=canvasSizePresets.includes(key)?key:'custom';
+      $('customCanvasSize').hidden=$('canvasPreset').value!=='custom';
+      $('applyCanvasSize').disabled=true;
+    }
+  }
+  function desiredCanvasSize(){
+    const preset=$('canvasPreset').value;
+    const [w,h]=preset==='custom'?[Number($('canvasWidth').value),Number($('canvasHeight').value)]:preset.split('x').map(Number);
+    return {width:w,height:h};
+  }
+  function updateCanvasSizeForm(){
+    const preset=$('canvasPreset').value;
+    $('customCanvasSize').hidden=preset!=='custom';
+    if(preset==='custom' && !Number($('canvasWidth').value))$('canvasWidth').value=dimensions().width;
+    if(preset==='custom' && !Number($('canvasHeight').value))$('canvasHeight').value=dimensions().height;
+    const {width,height}=desiredCanvasSize();
+    const valid=Number.isInteger(width)&&Number.isInteger(height)&&width>=128&&height>=128&&width<=1920&&height<=1920;
+    $('applyCanvasSize').disabled=!valid||(width===dimensions().width&&height===dimensions().height);
+  }
+  async function applyCanvasSize(){
+    const {width,height}=desiredCanvasSize();
+    if(!Number.isInteger(width)||!Number.isInteger(height)||width<128||height<128||width>1920||height>1920){toast('Choose a width and height between 128 and 1920 pixels');return;}
+    if(width===dimensions().width&&height===dimensions().height)return;
+    if(project.frames.some(frame=>frame.strokes.length)){
+      const ok=await confirmAction('Resize all animation frames?',`Resize from ${dimensions().width} × ${dimensions().height} to ${width} × ${height}? Artwork will be scaled to fit and centered in every frame for all collaborators.`);
+      if(!ok)return;
+    }
+    stopPlay();selection=null;localDraft=null;moveDraft=null;lassoDraft=null;
+    $('applyCanvasSize').disabled=true;
+    const ok=await postOp({type:'canvas-resize',width,height});
+    if(ok)toast(`Canvas resized to ${width} × ${height}`);
+    else updateCanvasSizeForm();
   }
   function editedPreview(frame){
     if(!moveDraft || !selection || selection.frameId!==frame?.id)return frame;
@@ -99,7 +153,7 @@
     return {...frame,strokes:frame.strokes.map(s=>ids.has(s.id)?moveStroke(s,moveDraft.dx,moveDraft.dy):s)};
   }
   function makeLayer(frame,drafts=[]) {
-    scratchCtx.clearRect(0,0,960,540);
+    scratchCtx.clearRect(0,0,scratch.width,scratch.height);
     for(const stroke of (frame?.strokes||[]))paintPath(scratchCtx,stroke);
     for(const draft of drafts)paintPath(scratchCtx,draft);
     return scratch;
@@ -127,7 +181,7 @@
   }
   function renderCanvas(){
     if(!project)return;
-    drawCtx.save();drawCtx.fillStyle='#ffffff';drawCtx.fillRect(0,0,960,540);
+    drawCtx.save();drawCtx.fillStyle='#ffffff';drawCtx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
     const idx=indexOfFrame();
     if(onion && !playing){
       for(let d=onionPrev;d>=1;d--){
@@ -159,12 +213,15 @@
   function renderTimeline(){
     if(!project)return;
     const strip=$('frameStrip');strip.textContent='';
+    const {width,height}=dimensions();
+    const thumbScale=Math.min(308/width,174/height);
+    const thumbWidth=Math.max(1,Math.round(width*thumbScale)),thumbHeight=Math.max(1,Math.round(height*thumbScale));
     project.frames.forEach((frame,i)=>{
       const item=document.createElement('div');item.className=`frame-item${frame.id===activeFrameId?' selected':''}`;
       item.tabIndex=0;item.draggable=true;item.dataset.frameId=frame.id;item.title=`Frame ${i+1} · click to select; drag to reorder`;
       const thumbWrap=document.createElement('div');thumbWrap.className='frame-thumb-wrap';
-      const canvas=document.createElement('canvas');canvas.width=308;canvas.height=174;
-      paintFrameOn(canvas.getContext('2d'),frame,308,174);
+      const canvas=document.createElement('canvas');canvas.width=thumbWidth;canvas.height=thumbHeight;
+      paintFrameOn(canvas.getContext('2d'),frame,thumbWidth,thumbHeight);
       const index=document.createElement('div');index.className='frame-index';index.textContent=TWO(i+1);
       thumbWrap.append(canvas,index);
       const bottom=document.createElement('div');bottom.className='frame-bottom';
@@ -197,7 +254,7 @@
   function syncUI(){
     if(!project.frames.some(f=>f.id===activeFrameId))activeFrameId=project.frames[Math.max(0,Math.min(project.frames.length-1,indexOfFrame()))]?.id||project.frames[0]?.id;
     if(document.activeElement!==$('projectTitle'))$('projectTitle').value=project.title;
-    renderTimeline();updateSelectionUI();renderCanvas();
+    updateCanvasDimensions();renderTimeline();updateSelectionUI();renderCanvas();
   }
   function applyOp(op,sender){
     if(!project)return;
@@ -234,6 +291,14 @@
         if(idx>=0)project.frames.splice(op.targetIndex,0,project.frames.splice(idx,1)[0]);break;
       }
       case 'frame-clear': if(frame)frame.strokes=[];break;
+      case 'canvas-resize': {
+        const oldWidth=op.oldWidth||dimensions().width,oldHeight=op.oldHeight||dimensions().height;
+        for(const f of project.frames)f.strokes=f.strokes.map(s=>resizeStroke(s,oldWidth,oldHeight,op.width,op.height));
+        project.width=op.width;project.height=op.height;
+        selection=null;localDraft=null;moveDraft=null;lassoDraft=null;
+        undoStack=[];redoStack=[];updateHistoryUI();
+        break;
+      }
       case 'fps-set':project.fps=op.fps;if(playing){stopPlay();startPlay()}break;
       case 'title-set':project.title=op.title;break;
     }
@@ -279,7 +344,7 @@
   }
   function pointerPoint(e){
     const rect=drawCanvas.getBoundingClientRect();
-    return [Math.max(0,Math.min(960,((e.clientX-rect.left)/rect.width)*960)),Math.max(0,Math.min(540,((e.clientY-rect.top)/rect.height)*540))];
+    return [Math.max(0,Math.min(dimensions().width,((e.clientX-rect.left)/rect.width)*dimensions().width)),Math.max(0,Math.min(dimensions().height,((e.clientY-rect.top)/rect.height)*dimensions().height))];
   }
   function sendDraft(end=false){
     if(!project)return;
@@ -437,10 +502,10 @@
   function setBrushSize(next){brushSize=Number(next);$('brushSize').value=brushSize;$('brushSizeValue').textContent=`${brushSize} px`;$('brushPreviewDot').style.width=`${Math.min(48,brushSize)}px`;$('brushPreviewDot').style.height=`${Math.min(48,brushSize)}px`}
   async function bucketFill(p){
     const frame=activeFrame();if(!frame)return;
-    const buffer=document.createElement('canvas');buffer.width=960;buffer.height=540;
+    const buffer=document.createElement('canvas');buffer.width=dimensions().width;buffer.height=dimensions().height;
     const ctx=buffer.getContext('2d',{willReadFrequently:true});paintFrameOn(ctx,frame);
-    const pixels=ctx.getImageData(0,0,960,540).data,w=960,h=540;
-    const x=Math.floor(Math.min(959,p[0])),y=Math.floor(Math.min(539,p[1]));
+    const {width:w,height:h}=dimensions();const pixels=ctx.getImageData(0,0,w,h).data;
+    const x=Math.floor(Math.min(w-1,p[0])),y=Math.floor(Math.min(h-1,p[1]));
     const start=(y*w+x),base=start*4,seed=[pixels[base],pixels[base+1],pixels[base+2]];
     const hex=color.slice(1),rgb=[parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16)];
     const result=new ImageData(w,h),visited=new Uint8Array(w*h),queue=new Int32Array(w*h);
@@ -469,14 +534,14 @@
       try{
         const source=URL.createObjectURL(file),im=new Image();
         await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=reject;im.src=source;});
-        const scale=Math.min(840/im.naturalWidth,470/im.naturalHeight,1);
+        const scale=Math.min(dimensions().width*.88/im.naturalWidth,dimensions().height*.87/im.naturalHeight,1);
         const w=Math.max(1,Math.round(im.naturalWidth*scale)),h=Math.max(1,Math.round(im.naturalHeight*scale));
         const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
         canvas.getContext('2d').drawImage(im,0,0,w,h);URL.revokeObjectURL(source);
         let src=canvas.toDataURL('image/webp',.88);
         if(!src.startsWith('data:image/webp'))src=canvas.toDataURL('image/png');
         if(src.length>1_600_000)throw new Error('Image too large after compression');
-        const frameId=activeFrameId,stroke={id:uid(),kind:'image',role:'image',src,x:Math.round((960-w)/2),y:Math.round((540-h)/2),w,h,opacity:1};
+        const frameId=activeFrameId,stroke={id:uid(),kind:'image',role:'image',src,x:Math.round((dimensions().width-w)/2),y:Math.round((dimensions().height-h)/2),w,h,opacity:1};
         await postOp({type:'stroke-add',frameId,stroke},historyInsert(frameId,stroke));
         toast('Image added — use Lasso to move it');
       }catch(err){errorMessage(err);}
@@ -596,13 +661,13 @@
     anchor.href=url;anchor.download=filename;document.body.append(anchor);anchor.click();anchor.remove();
     setTimeout(()=>URL.revokeObjectURL(url),60_000);
   }
-  function paintExportFrame(ctx,frame){paintFrameOn(ctx,frame,960,540)}
+  function paintExportFrame(ctx,frame){paintFrameOn(ctx,frame,ctx.canvas.width,ctx.canvas.height)}
   async function recordVideo(frames,fps,format,label){
     if(!('MediaRecorder' in window)||!HTMLCanvasElement.prototype.captureStream)throw new Error('Video recording requires Chrome, Edge, Firefox or Safari');
     const types=format==='mp4'?['video/mp4;codecs=avc1.42E01E','video/mp4']:['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
     const supported=types.find(t=>MediaRecorder.isTypeSupported(t));
     if(!supported)throw new Error(`${format.toUpperCase()} recording is not supported in this browser. Try WebM or GIF.`);
-    const canvas=document.createElement('canvas');canvas.width=960;canvas.height=540;
+    const canvas=document.createElement('canvas');canvas.width=dimensions().width;canvas.height=dimensions().height;
     const ctx=canvas.getContext('2d',{alpha:false});
     paintExportFrame(ctx,frames[0]);
     const stream=canvas.captureStream(Math.max(30,fps));let recorder;
@@ -637,9 +702,11 @@
         const encoder=window.FlipbookExport;
         if(!encoder)throw new Error('Exporter library did not load');
         const update=n=>{label.textContent=`Exporting ${n}%`};
-        if(format==='gif'){blob=await encoder.gif(frames,fps,paintFrameOn,update);ext='gif';}
-        else if(format==='pngzip'){blob=await encoder.zipPng(frames,paintFrameOn,update);ext='zip';}
-        else if(format==='sheet'){blob=await encoder.sheet(frames,paintFrameOn,update);ext='png';}
+        const paint=(ctx,frame,width,height)=>paintFrameOn(ctx,frame,width,height);
+        paint.canvasSize={width:dimensions().width,height:dimensions().height};
+        if(format==='gif'){blob=await encoder.gif(frames,fps,paint,update);ext='gif';}
+        else if(format==='pngzip'){blob=await encoder.zipPng(frames,paint,update);ext='zip';}
+        else if(format==='sheet'){blob=await encoder.sheet(frames,paint,update);ext='png';}
       }
       download(blob,`${baseFilename()}${format==='sheet'?'-spritesheet':format==='pngzip'?'-frames':''}.${ext}`);
       toast(`Exported ${ext.toUpperCase()} successfully`);
@@ -665,6 +732,10 @@
     for(const id of ['curveX1','curveY1','curveX2','curveY2'])$(id).addEventListener('input',()=>{$('tweenEase').value='custom';updateCurve()});
     $('tweenBtn').addEventListener('click',generateTweens);updateCurve();updateHistoryUI();
     $('onionToggle').addEventListener('change',e=>{onion=e.target.checked;renderCanvas()});
+    $('canvasPreset').addEventListener('change',updateCanvasSizeForm);
+    $('canvasWidth').addEventListener('input',updateCanvasSizeForm);
+    $('canvasHeight').addEventListener('input',updateCanvasSizeForm);
+    $('applyCanvasSize').addEventListener('click',applyCanvasSize);
     $('fpsSelect').addEventListener('change',e=>postOp({type:'fps-set',fps:Number(e.target.value)}));
     $('projectTitle').addEventListener('change',e=>postOp({type:'title-set',title:e.target.value}));
     $('projectTitle').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur()});

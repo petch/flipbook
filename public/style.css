@@ -22,3 +22,17 @@
   .export-format{max-width:108px;min-width:0;font-size:11px}
   .topbar .button{padding:9px 10px}
 }
+
+/* Project canvas size controls and aspect-ratio preserving artboards */
+.canvas-size-label{display:block;margin:14px 0 7px;font-size:11px;color:#a3a8bd}
+.canvas-preset{width:100%;padding:9px 10px;border:1px solid #414659;border-radius:8px;background:#252a3b;color:#e4e3f0;font-size:12px}
+.canvas-size-fields{display:flex;align-items:end;gap:6px;margin-top:10px;color:#8d93a9;font-size:12px}
+.canvas-size-fields label{flex:1;min-width:0;font-size:10px;color:#a3a8bd;display:grid;gap:5px}
+.canvas-size-fields input{width:100%;min-width:0;padding:8px;border:1px solid #414659;border-radius:7px;background:#252a3b;color:#e4e3f0}
+.canvas-size-fields>span{padding-bottom:9px}
+.canvas-size-apply{display:block;width:100%;margin-top:10px}
+.canvas-size-hint{font-size:10px;line-height:1.55;color:#8f95aa;margin:11px 0 16px}
+.artboard-wrap{aspect-ratio:var(--canvas-aspect,1.77778);width:min(100%,960px,calc(58vh * var(--canvas-aspect,1.77778)))}
+.frame-thumb-wrap{display:flex;align-items:center;justify-content:center}
+.frame-thumb-wrap canvas{height:auto;width:auto;max-width:100%;max-height:100%;object-fit:contain;flex:none}
+@media(max-width:680px){.artboard-wrap{width:min(100%,calc(45vh * var(--canvas-aspect,1.77778)))}}
