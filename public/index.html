@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#11131c" />
+  <title>Flipbook — collaborative animation studio</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="landing" class="landing" hidden>
+    <div class="landing-ambient"></div>
+    <div class="landing-content">
+      <div class="brand brand-landing"><span class="brand-mark">✦</span><span>flipbook<span class="brand-dot">.</span></span></div>
+      <div class="eyebrow"><span class="live-dot"></span> A LITTLE STUDIO FOR BIG IDEAS</div>
+      <h1>Draw together.<br /><em>Bring it to life.</em></h1>
+      <p>Make hand-drawn animations, frame by frame. Invite your friends to the same canvas, watch your story move, and export a video.</p>
+      <div class="landing-actions"><button id="newProject" class="button button-primary button-large">Create a flipbook <span>↗</span></button><span>No account required</span></div>
+      <div class="sample-sheet" aria-hidden="true">
+        <div class="sample-card card-a"><svg viewBox="0 0 160 100"><path d="M15 76 Q70 20 144 73"/><circle cx="76" cy="31" r="17"/><path d="M57 52 Q76 67 94 52"/></svg><small>01</small></div>
+        <div class="sample-card card-b"><svg viewBox="0 0 160 100"><path d="M15 76 Q70 20 144 73"/><circle cx="86" cy="25" r="17"/><path d="M66 55 Q85 72 103 56"/></svg><small>02</small></div>
+        <div class="sample-card card-c"><svg viewBox="0 0 160 100"><path d="M15 76 Q70 20 144 73"/><circle cx="100" cy="28" r="17"/><path d="M78 57 Q98 73 116 55"/></svg><small>03</small></div>
+      </div>
+    </div>
+  </div>
+  <div id="loading" class="loading-screen"><div class="loading-logo">✦</div><div>Opening your studio…</div></div>
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <div class="topbar-start">
+        <a class="brand" href="/" title="Flipbook home"><span class="brand-mark">✦</span><span>flipbook<span class="brand-dot">.</span></span></a>
+        <div class="topbar-divider"></div>
+        <div class="project-name"><input id="projectTitle" aria-label="Project name" maxlength="80" title="Click to rename your project" /><span class="rename-icon" title="Rename">✎</span></div>
+        <span id="saveState" class="save-state"><span class="live-dot"></span> Live sync</span>
+      </div>
+      <div class="topbar-actions">
+        <div class="collaborators" id="collaborators" aria-label="Online collaborators"></div>
+        <span id="onlineCount" class="online-count">1 online</span>
+        <button id="inviteBtn" class="button button-secondary" title="Copy invitation link"><svg class="ui-icon"><use href="#i-link"/></svg><span>Invite</span></button>
+        <button id="exportBtn" class="button button-primary"><svg class="ui-icon"><use href="#i-download"/></svg><span>Export video</span></button>
+      </div>
+    </header>
+
+    <div class="main-layout">
+      <aside class="left-sidebar">
+        <div class="section-label">DRAWING TOOLS</div>
+        <div class="tool-grid">
+          <button class="tool-button is-active" data-tool="pen" title="Brush (B)"><svg class="ui-icon"><use href="#i-brush"/></svg><span>Brush</span><small>B</small></button>
+          <button class="tool-button" data-tool="eraser" title="Eraser (E)"><svg class="ui-icon"><use href="#i-eraser"/></svg><span>Eraser</span><small>E</small></button>
+        </div>
+        <div class="sidebar-rule"></div>
+        <div class="tool-head"><div class="section-label">COLOR</div><span id="colorCode" class="subtle">#252139</span></div>
+        <div class="color-swatches" id="colorSwatches">
+          <button class="color-swatch selected" style="--swatch:#252139" data-color="#252139" aria-label="Ink black" title="Ink black"></button>
+          <button class="color-swatch" style="--swatch:#7665C9" data-color="#7665C9" aria-label="Purple" title="Purple"></button>
+          <button class="color-swatch" style="--swatch:#E36979" data-color="#E36979" aria-label="Coral" title="Coral"></button>
+          <button class="color-swatch" style="--swatch:#E5A15B" data-color="#E5A15B" aria-label="Orange" title="Orange"></button>
+          <button class="color-swatch" style="--swatch:#EBCB6D" data-color="#EBCB6D" aria-label="Yellow" title="Yellow"></button>
+          <button class="color-swatch" style="--swatch:#68B9A8" data-color="#68B9A8" aria-label="Mint" title="Mint"></button>
+          <button class="color-swatch" style="--swatch:#5F94D4" data-color="#5F94D4" aria-label="Blue" title="Blue"></button>
+          <label class="color-custom" title="Choose custom color"><input id="colorPicker" type="color" value="#252139" aria-label="Custom brush color" /><svg class="ui-icon"><use href="#i-plus"/></svg></label>
+        </div>
+        <div class="sidebar-rule"></div>
+        <div class="tool-head"><label for="brushSize" class="section-label">BRUSH SIZE</label><span id="brushSizeValue" class="subtle">8 px</span></div>
+        <input id="brushSize" class="range" type="range" min="1" max="48" value="8" />
+        <div class="brush-preview"><span id="brushPreviewDot"></span></div>
+        <div class="sidebar-rule"></div>
+        <div class="section-label">QUICK ACTIONS</div>
+        <button id="undoBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-undo"/></svg> Undo stroke <kbd>Ctrl Z</kbd></button>
+        <button id="clearFrameBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-trash"/></svg> Clear frame</button>
+        <div class="left-bottom"><div class="hint-icon">✦</div><p>Little strokes make<br />great stories.</p></div>
+      </aside>
+
+      <main class="workspace">
+        <div class="workspace-heading">
+          <div><div class="section-label">YOUR CANVAS</div><div class="workspace-frame-title">Frame <span id="currentFrameNum">01</span><span class="muted"> / </span><span id="totalFrames">01</span></div></div>
+          <div class="canvas-meta"><span class="canvas-live"><span class="live-dot"></span> Everyone can draw</span><span class="resolution">960 × 540</span></div>
+        </div>
+        <div class="stage" id="stage">
+          <div class="stage-ambient"></div>
+          <div class="artboard-wrap"><canvas id="drawCanvas" width="960" height="540" aria-label="Drawing canvas: draw with mouse, stylus, or touch"></canvas></div>
+          <div class="stage-bottom-note"><svg class="ui-icon"><use href="#i-sparkles"/></svg><span>Draw something wonderful</span></div>
+        </div>
+        <div class="playback-bar">
+          <div class="transport">
+            <button id="firstFrameBtn" class="icon-button" title="First frame"><svg class="ui-icon"><use href="#i-skip-back"/></svg></button>
+            <button id="prevFrameBtn" class="icon-button" title="Previous frame (←)"><svg class="ui-icon"><use href="#i-prev"/></svg></button>
+            <button id="playBtn" class="play-button" title="Play animation (space)"><svg class="ui-icon"><use href="#i-play"/></svg></button>
+            <button id="nextFrameBtn" class="icon-button" title="Next frame (→)"><svg class="ui-icon"><use href="#i-next"/></svg></button>
+            <button id="lastFrameBtn" class="icon-button" title="Last frame"><svg class="ui-icon"><use href="#i-skip-forward"/></svg></button>
+          </div>
+          <div class="playback-right"><span class="playback-chip"><span id="frameCounter">01 / 01</span></span><span class="bar-divider"></span><label class="fps-label" for="fpsSelect">SPEED</label><select id="fpsSelect" aria-label="Animation frames per second"><option>4</option><option>6</option><option selected>8</option><option>10</option><option>12</option><option>15</option><option>18</option><option>24</option></select><span class="fps-text">FPS</span></div>
+        </div>
+      </main>
+
+      <aside class="right-sidebar">
+        <div class="right-heading">Animation <span class="right-heading-icon">✧</span></div>
+        <p class="right-description">Your story, one frame at a time.</p>
+        <div class="sidebar-rule"></div>
+        <div class="setting-row"><div><div class="setting-name">Onion skin</div><div class="setting-desc">See your previous frame</div></div><label class="switch" title="Show previous frame faintly"><input id="onionToggle" type="checkbox" checked /><span class="switch-track"></span></label></div>
+        <div class="sidebar-rule"></div>
+        <div class="section-label">HOW IT WORKS</div>
+        <div class="guide-steps"><div class="guide-step"><span>01</span><p>Draw something on your canvas.</p></div><div class="guide-step"><span>02</span><p>Add a frame, then move your drawing a little.</p></div><div class="guide-step"><span>03</span><p>Hit play and watch it come to life!</p></div></div>
+        <div class="invite-card"><div class="invite-card-graphic"><span>✎</span><span>✦</span><span>◡</span></div><div class="invite-card-title">Better together.</div><p>Invite friends to draw in this flipbook with you, in real time.</p><button id="sideInviteBtn">Copy invite link <span>↗</span></button></div>
+        <div class="sidebar-footer">MADE FOR CREATIVE MINDS <span>✦</span></div>
+      </aside>
+    </div>
+
+    <section class="timeline" aria-label="Animation frames timeline">
+      <div class="timeline-header"><div><span class="timeline-heading">Timeline</span><span class="timeline-counter" id="timelineCount">1 frame</span></div><div class="timeline-actions"><button id="duplicateFrameBtn" class="timeline-action"><svg class="ui-icon"><use href="#i-copy"/></svg> Duplicate</button><button id="deleteFrameBtn" class="timeline-action"><svg class="ui-icon"><use href="#i-trash"/></svg> Delete</button><button id="addFrameBtn" class="button button-primary button-small"><svg class="ui-icon"><use href="#i-plus"/></svg> Add frame</button></div></div>
+      <div class="frame-strip" id="frameStrip"></div>
+      <div class="timeline-foot"><span>Tip: drag frames to reorder · Right-click a frame to duplicate</span><span><span class="live-dot"></span> Changes are shared automatically</span></div>
+    </section>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <dialog id="confirmDialog" class="dialog"><form method="dialog"><h2 id="dialogTitle">Are you sure?</h2><p id="dialogMessage"></p><div class="dialog-buttons"><button value="cancel" class="button button-secondary">Cancel</button><button value="confirm" class="button button-danger">Confirm</button></div></form></dialog>
+  <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <symbol id="i-brush" viewBox="0 0 24 24"><path d="m14 5 5 5M4 20c3 0 5-1.5 5-4 0-.8-.2-1.6-.8-2.2L18.4 3.6a2 2 0 0 1 2.8 2.8L11 16.6M4 20c-1.4 0-2-.7-2-2 0-1.3 1.2-2.5 2.7-2.5"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m20 20-11 0a3 3 0 0 1-2.2-.9L3.9 16a3 3 0 0 1 0-4.2l7.9-8a3 3 0 0 1 4.2 0l5 5a3 3 0 0 1 0 4.2L14 20M8 8l8 8"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 .1l3-3a5 5 0 1 0-7-7l-2 2M14 11a5 5 0 0 0-7-.1l-3 3a5 5 0 0 0 7 7l2-2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="3"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+    <symbol id="i-skip-back" viewBox="0 0 24 24"><path d="m18 6-6 6 6 6M6 5v14"/></symbol>
+    <symbol id="i-skip-forward" viewBox="0 0 24 24"><path d="m6 6 6 6-6 6M18 5v14"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6L12 3ZM19 17l.6 1.4L21 19l-1.4.6L19 21l-.6-1.4L17 19l1.4-.6L19 17Z"/></symbol>
+  </svg>
+  <script src="/app.js" defer></script>
+</body>
+</html>
