@@ -36,7 +36,8 @@
         <div class="collaborators" id="collaborators" aria-label="Online collaborators"></div>
         <span id="onlineCount" class="online-count">1 online</span>
         <button id="inviteBtn" class="button button-secondary" title="Copy invitation link"><svg class="ui-icon"><use href="#i-link"/></svg><span>Invite</span></button>
-        <button id="exportBtn" class="button button-primary"><svg class="ui-icon"><use href="#i-download"/></svg><span>Export video</span></button>
+        <select id="exportFormat" class="export-format" aria-label="Export format"><option value="webm">WebM video</option><option value="mp4">MP4 video</option><option value="gif">Animated GIF</option><option value="pngzip">PNG sequence ZIP</option><option value="sheet">PNG sprite sheet</option></select>
+        <button id="exportBtn" class="button button-primary"><svg class="ui-icon"><use href="#i-download"/></svg><span>Export</span></button>
       </div>
     </header>
 
@@ -46,6 +47,8 @@
         <div class="tool-grid">
           <button class="tool-button is-active" data-tool="pen" title="Brush (B)"><svg class="ui-icon"><use href="#i-brush"/></svg><span>Brush</span><small>B</small></button>
           <button class="tool-button" data-tool="eraser" title="Eraser (E)"><svg class="ui-icon"><use href="#i-eraser"/></svg><span>Eraser</span><small>E</small></button>
+          <button class="tool-button" data-tool="bucket" title="Paint bucket (G)"><svg class="ui-icon"><use href="#i-bucket"/></svg><span>Bucket</span><small>G</small></button>
+          <button class="tool-button" data-tool="lasso" title="Lasso selection (L)"><svg class="ui-icon"><use href="#i-lasso"/></svg><span>Lasso</span><small>L</small></button>
         </div>
         <div class="sidebar-rule"></div>
         <div class="tool-head"><div class="section-label">COLOR</div><span id="colorCode" class="subtle">#252139</span></div>
@@ -65,7 +68,11 @@
         <div class="brush-preview"><span id="brushPreviewDot"></span></div>
         <div class="sidebar-rule"></div>
         <div class="section-label">QUICK ACTIONS</div>
-        <button id="undoBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-undo"/></svg> Undo stroke <kbd>Ctrl Z</kbd></button>
+        <button id="undoBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-undo"/></svg> Undo <kbd>Ctrl Z</kbd></button>
+        <button id="redoBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-redo"/></svg> Redo <kbd>Ctrl Y</kbd></button>
+        <button id="importImageBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-image"/></svg> Import image <kbd>PNG, JPG</kbd></button>
+        <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+        <div id="selectionActions" class="selection-actions" hidden><div class="section-label">SELECTION</div><button id="duplicateSelectionBtn" class="sidebar-action">Duplicate selection</button><button id="deleteSelectionBtn" class="sidebar-action">Delete selection</button><button id="deselectBtn" class="sidebar-action">Deselect</button></div>
         <button id="clearFrameBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-trash"/></svg> Clear frame</button>
         <div class="left-bottom"><div class="hint-icon">✦</div><p>Little strokes make<br />great stories.</p></div>
       </aside>
@@ -97,6 +104,14 @@
         <p class="right-description">Your story, one frame at a time.</p>
         <div class="sidebar-rule"></div>
         <div class="setting-row"><div><div class="setting-name">Onion skin</div><div class="setting-desc">See your previous frame</div></div><label class="switch" title="Show previous frame faintly"><input id="onionToggle" type="checkbox" checked /><span class="switch-track"></span></label></div>
+        <div class="onion-controls"><label class="setting-row compact-setting">Previous frames <select id="onionPrev" aria-label="Previous onion frames"><option>0</option><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label><label class="setting-row compact-setting">Next frames <select id="onionNext" aria-label="Next onion frames"><option selected>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+        <div class="sidebar-rule"></div>
+        <div class="section-label">SHAPE TWEEN</div>
+        <p class="tween-explainer">Draw two keyframes next to each other, then generate smooth in-between frames. Matching strokes morph along an easing curve.</p>
+        <label class="setting-row compact-setting">In-between frames <select id="tweenCount"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select></label>
+        <label class="setting-row compact-setting">Curve <select id="tweenEase"><option value="linear">Linear</option><option value="ease" selected>Ease in / out</option><option value="easein">Ease in</option><option value="easeout">Ease out</option><option value="custom">Custom Bézier</option></select></label>
+        <div id="curveEditor" class="curve-editor"><svg id="curvePreview" viewBox="0 0 160 100" aria-label="Motion easing curve preview"></svg><label>First handle Y <input id="curveY1" type="range" min="0" max="1" step="0.05" value="0"/></label><label>Second handle Y <input id="curveY2" type="range" min="0" max="1" step="0.05" value="1"/></label><label>First handle X <input id="curveX1" type="range" min="0" max="1" step="0.05" value="0.42"/></label><label>Second handle X <input id="curveX2" type="range" min="0" max="1" step="0.05" value="0.58"/></label></div>
+        <button id="tweenBtn" class="button button-secondary tween-button">Generate in-betweens</button>
         <div class="sidebar-rule"></div>
         <div class="section-label">HOW IT WORKS</div>
         <div class="guide-steps"><div class="guide-step"><span>01</span><p>Draw something on your canvas.</p></div><div class="guide-step"><span>02</span><p>Add a frame, then move your drawing a little.</p></div><div class="guide-step"><span>03</span><p>Hit play and watch it come to life!</p></div></div>
@@ -120,6 +135,10 @@
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 .1l3-3a5 5 0 1 0-7-7l-2 2M14 11a5 5 0 0 0-7-.1l-3 3a5 5 0 0 0 7 7l2-2"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5M20 9H10a6 6 0 0 0 0 12h2"/></symbol>
+    <symbol id="i-bucket" viewBox="0 0 24 24"><path d="m4 13 7-8 9 9-7 7zM11 5 8 2M20 17c2 3 2 4 0 4s-2-1 0-4Z"/></symbol>
+    <symbol id="i-lasso" viewBox="0 0 24 24"><path stroke-dasharray="2 3" d="M17 4C4 0 1 17 10 19c8 2 13-8 5-10-7-2-9 12-2 12"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="2"/><path d="m4 18 6-6 4 4 3-3 4 5"/></symbol>
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
     <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z" fill="currentColor" stroke="none"/></symbol>
@@ -130,6 +149,7 @@
     <symbol id="i-skip-forward" viewBox="0 0 24 24"><path d="m6 6 6 6-6 6M18 5v14"/></symbol>
     <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6L12 3ZM19 17l.6 1.4L21 19l-1.4.6L19 21l-.6-1.4L17 19l1.4-.6L19 17Z"/></symbol>
   </svg>
+  <script src="/encoder.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

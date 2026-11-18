@@ -1,54 +1,60 @@
-# Flipbook Studio
+# Flipbook Studio 2
 
-A small, real-time collaborative frame-by-frame animation website. Draw with a mouse, touch, or stylus; invite people with a project URL; make and reorder frames; preview at different frame rates; export a downloadable WebM video (or MP4 if supported by the browser).
+A dependency-free Node.js website for collaborative, frame-by-frame 2D animation. Works with mouse, stylus, or touch. Projects are shared by URL and automatically saved locally as JSON.
 
 ## Start locally
 
-Requires **Node.js 18+**. No npm dependencies, databases, accounts, or API keys.
+Requires **Node.js 18+**. No npm installation or API keys required.
 
 ```bash
 npm start
 ```
 
-Open `http://localhost:3000` and click **Create a flipbook**. To test collaboration, open the resulting project link in two browser tabs or share it with someone who can access the server.
+Open **http://localhost:3000**. Create a project and share its URL. For a different port, set the `PORT` environment variable.
 
-To run on a different port:
+## Deploy on Render (free Web Service)
 
-```bash
-PORT=8080 npm start
-```
+1. Upload **the contents of this folder** to a GitHub repository, so `package.json` and `server.js` are in the repository root.
+2. In [Render Dashboard](https://dashboard.render.com/web/new), create a **Web Service** connected to that repository.
+3. Choose **Node**, **Free**, **Build command:** `npm install`, **Start command:** `npm start`.
+4. Visit the public `*.onrender.com` URL and share the project link.
 
-On Windows PowerShell:
+**Data warning:** Render Free has an ephemeral filesystem. `data/*.json` files **can be lost on idle shutdowns, redeployments, and restarts**. This edition is suitable for temporary experiments, not persistent shared projects on Render Free. For permanent hosting, add an external database or storage service. Export before leaving your work unattended.
 
-```powershell
-$env:PORT=8080; npm start
-```
+## Editing features
 
-## Share with others over the internet
+- Brush (`B`), eraser (`E`), flood-fill bucket (`G`), lasso select/move (`L`)
+- Lasso: draw a closed-looking freehand outline around strokes or imported images; drag the selection to move. Duplicate, delete, and deselect selected items using the left toolbar. A selection moves **whole strokes/images**, not individual pixels within a stroke.
+- Image import: PNG/JPEG/WebP/GIF (GIF **first frame only**). Images are converted to WebP or PNG, automatically resized and embedded into the shared project. Use Lasso to reposition. Max compressed image data ~1.6 MB.
+- Undo / redo for brush strokes, erasing, fills, imported images, lasso moves, selection edits, frame clear, and tween generation. `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z` or buttons. History is local to the browser session, and collaboration conflicts are still possible for full-frame edits.
+- Touch canvas: **two-finger quick tap = undo**, **three-finger quick tap = redo**. Drag one finger to draw. Gesture recognition requires touches to remain mostly stationary, and browser/OS gestures can interfere.
+- Adjustable onion skins: independently show **0–5 previous** and **0–5 next** frames.
+- Add/duplicate/delete/reorder frames; 1–24 FPS preview; max 120 total frames.
 
-Deploy the Node.js application on an always-on host such as a VPS, Railway, Fly.io, or Render. Configure the start command as `npm start`, expose the assigned `PORT`, and attach a **persistent disk/volume to `data/`** so saved projects survive redeployments. Make sure your hosting service supports server-sent events (SSE) and does not buffer the event stream. Share the hosted project's URL (`https://your-domain/?p=...`).
+## Shape-tween generator
 
-**Important:** This is an open-by-link MVP without user authentication. Anyone with a project URL can edit or delete its frames. Do not use it for sensitive content or public high-traffic hosting without adding authentication, rate limits, and storage quotas. Use one server instance and a persistent filesystem; multi-instance scaling requires a shared database and pub/sub.
+Draw two **adjacent keyframes** and select the first. Choose number of in-betweens, an easing preset or **Custom Bézier** curve (X1/Y1/X2/Y2 handles), then click **Generate in-betweens**.
 
-## Features
+The generator **bakes editable 2D in-between frames** by matching strokes **in drawing order**, resampling vector paths, and blending points, color, and brush size. Imported identical images interpolate position and scale; different images cross-fade. This is **vector shape tweening**, not 3D skeletal blend shapes, automatic object tracking, or live procedural keyframe links. For best results, keep corresponding drawings and stroke order similar in both keyframes. Generated frames can then be edited individually.
 
-- Shared projects and automatically saved frame drawings
-- Live stroke previews and updates using standard HTTP + Server-Sent Events
-- Pen, eraser, color palette/custom color, brush size
-- Add, duplicate, clear, delete, and drag-to-reorder frames (max 120)
-- Undo most recently added stroke, onion skin, playback, speed 1–24 FPS
-- Online collaborator indicators, invite link copying
-- Browser-based video export: WebM on Chrome/Edge/Firefox, MP4 when supported
-- 960 × 540 16:9 canvas with responsive desktop/mobile layout
+## Export formats
 
-## Technical notes
+Select a format in the top-right dropdown, then click **Export**:
 
-- API and app are served from `server.js`, entirely with Node built-ins (no package installation needed).
-- Each animation is a JSON file under `data/`; edits are written atomically.
-- Frames store vector strokes. Erasing composites transparent strokes into the frame layer.
-- Real-time updates happen via `/api/projects/:id/events` (SSE); writes use POST requests. Draw previews are ephemeral; final strokes are persistent.
-- Export uses the browser's `MediaRecorder`, `canvas.captureStream()` and native video encoder. Video export happens locally in the browser and works best in Chrome/Edge. Very short animations repeat to at least ~1.5 seconds. No audio is included.
+| Format | Notes |
+|---|---|
+| WebM | 960×540, browser MediaRecorder, Chrome/Edge recommended |
+| MP4 | 960×540, **only if the browser supports MP4 MediaRecorder** |
+| Animated GIF | 480×270, 256-color palette, loops |
+| PNG sequence ZIP | Separate full-resolution 960×540 PNG per frame |
+| PNG sprite sheet | 480×270 per frame in a packed grid |
 
-## Suggested production improvements
+Video recordings are made in **real time**, and very short animations repeat to reach approximately 1.5 seconds. Exporting is performed locally in your browser. Audio is not included. Large animations and GIF export consume memory and may take longer.
 
-Add private rooms/login, role permissions, per-user undo history, image import, layers, audio, timestamps, public gallery, and server-side MP4 encoding; move projects from JSON to a database before scaling beyond one server.
+## Technical notes and limits
+
+- Vanilla HTML/CSS/JS frontend + Node built-in HTTP server; zero external npm dependencies.
+- Persisted drawings consist of vector strokes and embedded raster images in `data/<project-id>.json`.
+- Server-Sent Events (SSE) broadcast stroke operations and presence; HTTP POST saves operations.
+- Project links grant **full edit access** to anyone who possesses them; no accounts, roles, moderation, rate limits, or storage quotas.
+- Multiple artists editing the same stroke/frame simultaneously can conflict. For a public site, use authenticated access and transactional persistent storage.

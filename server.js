@@ -20,6 +20,8 @@ const str = (v,len=100) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g,'').
 const isId = v => typeof v === 'string' && idPattern.test(v);
 const json = (res, status, value) => { const body = JSON.stringify(value); res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Content-Length':Buffer.byteLength(body),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}); res.end(body); };
 const emptyFrame = id => ({ id, strokes:[] });
+const MAX_IMAGE_DATA = 1_600_000;
+const imageDataRe = /^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/;
 
 function projectFile(id) { return path.join(DATA,`${id}.json`); }
 function load(id) {
@@ -38,11 +40,17 @@ function presence(id) {
   broadcast(id,'presence',{clients});
 }
 function normalizeStroke(input) {
-  if (!input || !isId(input.id) || !['pen','eraser'].includes(input.tool)) return null;
+  if (!input || !isId(input.id)) return null;
+  const opacity=limit(input.opacity??1,0.001,1);
+  if (input.kind==='image') {
+    if (typeof input.src!=='string'||input.src.length>MAX_IMAGE_DATA||!imageDataRe.test(input.src)) return null;
+    return {id:input.id,kind:'image',role:input.role==='fill'?'fill':'image',src:input.src,x:limit(input.x??0,0,960),y:limit(input.y??0,0,540),w:limit(input.w??960,1,1920),h:limit(input.h??540,1,1080),opacity};
+  }
+  if (!['pen','eraser'].includes(input.tool)) return null;
   if (!Array.isArray(input.points) || !input.points.length || input.points.length>2000) return null;
   const points = input.points.map(p => [Math.round(limit(p[0],0,960)*10)/10,Math.round(limit(p[1],0,540)*10)/10]);
   const color = /^#[a-fA-F0-9]{6}$/.test(input.color) ? input.color : '#26223b';
-  return {id:input.id,tool:input.tool,color,size:limit(input.size,1,80),points};
+  return {id:input.id,tool:input.tool,color,size:limit(input.size,1,80),points,opacity};
 }
 function normalizeFrame(input) {
   if (!input || !isId(input.id) || !Array.isArray(input.strokes) || input.strokes.length>2000) return null;
@@ -59,6 +67,46 @@ function operate(p,op) {
       if (idx<0 || !stroke || p.frames[idx].strokes.length>=2000) return {error:'Invalid stroke'};
       if (p.frames[idx].strokes.some(s=>s.id===stroke.id)) return {error:'Duplicate stroke'};
       p.frames[idx].strokes.push(stroke); return {type:'stroke-add',frameId:op.frameId,stroke};
+    }
+    case 'stroke-insert': {
+      const stroke=normalizeStroke(op.stroke);
+      if(idx<0 || !stroke || p.frames[idx].strokes.length>=2000 || p.frames[idx].strokes.some(s=>s.id===stroke.id)) return {error:'Invalid stroke insertion'};
+      const at=Math.max(0,Math.min(p.frames[idx].strokes.length,Math.floor(Number(op.index)||0)));
+      p.frames[idx].strokes.splice(at,0,stroke);return {type:'stroke-insert',frameId:op.frameId,stroke,index:at};
+    }
+    case 'stroke-batch-update': {
+      if(idx<0 || !Array.isArray(op.strokes) || !op.strokes.length || op.strokes.length>2000) return {error:'Invalid stroke update'};
+      const updates=[];
+      for(const item of op.strokes) {
+        const stroke=normalizeStroke(item);
+        if(!stroke || !p.frames[idx].strokes.some(s=>s.id===stroke.id) || updates.some(s=>s.id===stroke.id)) return {error:'Unknown stroke in batch'};
+        updates.push(stroke);
+      }
+      for(const stroke of updates) {
+        const at=p.frames[idx].strokes.findIndex(s=>s.id===stroke.id);
+        p.frames[idx].strokes[at]=stroke;
+      }
+      return {type:'stroke-batch-update',frameId:op.frameId,strokes:updates};
+    }
+    case 'frame-replace': {
+      if(idx<0 || !Array.isArray(op.strokes) || op.strokes.length>2000) return {error:'Invalid frame replacement'};
+      const all=op.strokes.map(normalizeStroke);
+      if(all.some(s=>!s))return {error:'Invalid frame content'};
+      p.frames[idx].strokes=all;return {type:'frame-replace',frameId:op.frameId,strokes:all};
+    }
+    case 'frame-insert-batch': {
+      if(!Array.isArray(op.frames)||!op.frames.length||op.frames.length>24||p.frames.length+op.frames.length>120) return {error:'Too many tween frames'};
+      const frames=op.frames.map(normalizeFrame);
+      if(frames.some(f=>!f)||new Set(frames.map(f=>f.id)).size!==frames.length||frames.some(f=>p.frames.some(ex=>ex.id===f.id)))return {error:'Invalid tween frames'};
+      const at=p.frames.findIndex(f=>f.id===op.afterId);
+      p.frames.splice(at<0?p.frames.length:at+1,0,...frames);
+      return {type:'frame-insert-batch',afterId:op.afterId,frames};
+    }
+    case 'frame-delete-batch': {
+      if(!Array.isArray(op.frameIds)||!op.frameIds.length||p.frames.length<=op.frameIds.length)return {error:'Invalid frame IDs'};
+      const ids=new Set(op.frameIds);
+      if(ids.size!==op.frameIds.length||[...ids].some(id=>!p.frames.some(f=>f.id===id)))return {error:'Missing tween frame'};
+      p.frames=p.frames.filter(f=>!ids.has(f.id));return {type:'frame-delete-batch',frameIds:[...ids]};
     }
     case 'stroke-remove': {
       if (idx<0 || !isId(op.strokeId)) return {error:'Invalid stroke'};
@@ -138,7 +186,7 @@ const server=http.createServer(async(req,res)=>{
         return;
       }
       if(action==='ops' && req.method==='POST') {
-        const body=await readBody(req);
+        const body=await readBody(req,12_000_000);
         const op=operate(p,body.op);
         if(op.error)return json(res,400,{error:op.error});
         p.updatedAt=new Date().toISOString();save(p);

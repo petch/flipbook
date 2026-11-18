@@ -1,8 +1,13 @@
 {
   "name": "flipbook-studio",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Collaborative frame-by-frame animation editor with realtime drawing and video export",
-  "scripts": {"start": "node server.js", "dev": "node --watch server.js"},
-  "engines": {"node": ">=18"}
+  "description": "Collaborative frame-by-frame editor with lasso, bucket, image import, shape tweening and 5 export formats",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }
