@@ -119,6 +119,10 @@
       $('applyCanvasSize').disabled=true;
     }
   }
+  function closeCanvasSizePanel(){
+    $('canvasSizePanel').hidden=true;
+    $('canvasSizeToggle').setAttribute('aria-expanded','false');
+  }
   function desiredCanvasSize(){
     const preset=$('canvasPreset').value;
     const [w,h]=preset==='custom'?[Number($('canvasWidth').value),Number($('canvasHeight').value)]:preset.split('x').map(Number);
@@ -144,7 +148,7 @@
     stopPlay();selection=null;localDraft=null;moveDraft=null;lassoDraft=null;
     $('applyCanvasSize').disabled=true;
     const ok=await postOp({type:'canvas-resize',width,height});
-    if(ok)toast(`Canvas resized to ${width} × ${height}`);
+    if(ok){closeCanvasSizePanel();toast(`Canvas resized to ${width} × ${height}`);}
     else updateCanvasSizeForm();
   }
   function editedPreview(frame){
@@ -599,18 +603,87 @@
     try{await navigator.clipboard.writeText(link.href);toast('Invite link copied — share it with friends!')}
     catch{window.prompt('Copy the invite link:',link.href)}
   }
-  const curvePresets={linear:[0,0,1,1],ease:[.42,0,.58,1],easein:[.42,0,1,1],easeout:[0,0,.58,1]};
-  function curveValues(){return ['curveX1','curveY1','curveX2','curveY2'].map(id=>Number($(id).value));}
-  function updateCurve(){
-    const [x1,y1,x2,y2]=curveValues();
-    $('curvePreview').innerHTML=`<path d="M 10 90 H 150 M 10 10 V 90" stroke="#41465d" fill="none"/><path d="M10 90 C ${10+x1*140} ${90-y1*80}, ${10+x2*140} ${90-y2*80},150 10" stroke="#ab92f5" stroke-width="3" fill="none"/><path d="M10 90 L ${10+x1*140} ${90-y1*80} M150 10 L ${10+x2*140} ${90-y2*80}" stroke="#697491" stroke-dasharray="3 3" fill="none"/><circle cx="${10+x1*140}" cy="${90-y1*80}" r="4" fill="#eed18c"/><circle cx="${10+x2*140}" cy="${90-y2*80}" r="4" fill="#eed18c"/>`;
+  // DOTween Ease enum values exposed in the editor. The default Back overshoot is 1.70158;
+  // Flash uses three flashes so its oscillation is useful when baking in-between frames.
+  function evaluateEase(name,t){
+    if(t<=0)return 0;
+    if(t>=1)return 1;
+    if(name==='Unset')name='InOutQuad';
+    if(name==='Linear')return t;
+    if(['Flash','InFlash','OutFlash','InOutFlash'].includes(name)){
+      const flashes=3;
+      const step=Math.min(flashes-1,Math.floor(t*flashes));
+      let phase=t*flashes-step;
+      if(step%2)phase=1-phase;
+      if(name==='InFlash')return phase*phase;
+      if(name==='OutFlash')return 1-(1-phase)*(1-phase);
+      if(name==='InOutFlash')return phase<.5?2*phase*phase:1-2*(1-phase)*(1-phase);
+      return phase;
+    }
+    const kind=name.startsWith('InOut')?'InOut':name.startsWith('Out')?'Out':'In';
+    const family=name.slice(kind.length);
+    const n=({Quad:2,Cubic:3,Quart:4,Quint:5})[family];
+    if(n){
+      if(kind==='In')return t**n;
+      if(kind==='Out')return 1-(1-t)**n;
+      return t<.5?(2*t)**n/2:1-(-2*t+2)**n/2;
+    }
+    if(family==='Sine'){
+      if(kind==='In')return 1-Math.cos(t*Math.PI/2);
+      if(kind==='Out')return Math.sin(t*Math.PI/2);
+      return -(Math.cos(Math.PI*t)-1)/2;
+    }
+    if(family==='Expo'){
+      if(kind==='In')return 2**(10*t-10);
+      if(kind==='Out')return 1-2**(-10*t);
+      return t<.5?2**(20*t-10)/2:(2-2**(-20*t+10))/2;
+    }
+    if(family==='Circ'){
+      if(kind==='In')return 1-Math.sqrt(Math.max(0,1-t*t));
+      if(kind==='Out')return Math.sqrt(Math.max(0,1-(t-1)**2));
+      return t<.5?(1-Math.sqrt(Math.max(0,1-(2*t)**2)))/2:(Math.sqrt(Math.max(0,1-(-2*t+2)**2))+1)/2;
+    }
+    if(family==='Back'){
+      const s=1.70158;
+      if(kind==='In')return (s+1)*t*t*t-s*t*t;
+      if(kind==='Out')return 1+(s+1)*(t-1)**3+s*(t-1)**2;
+      const s2=s*1.525;
+      return t<.5?(2*t)**2*((s2+1)*2*t-s2)/2:((2*t-2)**2*((s2+1)*(2*t-2)+s2)+2)/2;
+    }
+    if(family==='Elastic'){
+      const twoPi=Math.PI*2;
+      // DOTween's standard default amplitude is 1.70158 (not the typical Penner amplitude 1).
+      const amp=1.70158;
+      if(kind==='InOut'){
+        const period=.45,phase=period/twoPi*Math.asin(1/amp);
+        const q=2*t-1;
+        return q<0?-.5*amp*(2**(10*q))*Math.sin((q-phase)*twoPi/period):1+.5*amp*(2**(-10*q))*Math.sin((q-phase)*twoPi/period);
+      }
+      const period=.3,phase=period/twoPi*Math.asin(1/amp);
+      return kind==='In'?-amp*(2**(10*(t-1)))*Math.sin((t-1-phase)*twoPi/period):1+amp*(2**(-10*t))*Math.sin((t-phase)*twoPi/period);
+    }
+    if(family==='Bounce'){
+      const out=x=>{
+        const c=7.5625,d=2.75;
+        if(x<1/d)return c*x*x;
+        if(x<2/d){x-=1.5/d;return c*x*x+.75;}
+        if(x<2.5/d){x-=2.25/d;return c*x*x+.9375;}
+        x-=2.625/d;return c*x*x+.984375;
+      };
+      if(kind==='In')return 1-out(1-t);
+      if(kind==='Out')return out(t);
+      return t<.5?(1-out(1-2*t))/2:(1+out(2*t-1))/2;
+    }
+    return t;
   }
-  function bezierAt(t,curve){
-    const [x1,y1,x2,y2]=curve;
-    const val=(t,a,b)=>3*(1-t)*(1-t)*t*a+3*(1-t)*t*t*b+t*t*t;
-    let lo=0,hi=1;
-    for(let i=0;i<22;i++){const m=(lo+hi)/2;if(val(m,x1,x2)<t)lo=m;else hi=m;}
-    return val((lo+hi)/2,y1,y2);
+  function updateCurve(){
+    const name=$('tweenEase').value;
+    const pts=Array.from({length:121},(_,i)=>{
+      const t=i/120,value=evaluateEase(name,t);
+      return `${i?'L':'M'} ${(10+140*t).toFixed(2)} ${(90-80*value).toFixed(2)}`;
+    });
+    $('curvePreview').innerHTML=`<path d="M10 90 H150 M10 10 V90" fill="none" stroke="#41465d" stroke-width="1.2"/><path d="M10 50 H150" stroke="#34394e" stroke-dasharray="3 4" fill="none"/><path d="${pts.join(' ')}" stroke="#b7a0ff" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round" fill="none"/>`;
+    $('curveHint').textContent=name.endsWith('Flash')?'Three flashes · default weight':name==='Unset'?'DOTween default · InOutQuad':`DOTween Ease.${name}`;
   }
   function resample(points,n){
     if(points.length===1)return Array.from({length:n},()=>[...points[0]]);
@@ -627,7 +700,14 @@
   function colorLerp(a,b,t){
     const channels=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16));
     const A=channels(a),B=channels(b);
-    return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('');
+    return '#'+A.map((v,i)=>Math.max(0,Math.min(255,Math.round(v+(B[i]-v)*t))).toString(16).padStart(2,'0')).join('');
+  }
+  function normalizeTweenStroke(stroke){
+    const {width,height}=dimensions();
+    const bound=(v,min,max)=>Math.max(min,Math.min(max,v));
+    const opacity=bound(stroke.opacity??1,0.001,1);
+    if(stroke.kind==='image')return {...stroke,opacity,x:bound(stroke.x,0,width),y:bound(stroke.y,0,height),w:bound(stroke.w,1,width*2),h:bound(stroke.h,1,height*2)};
+    return {...stroke,opacity,size:bound(stroke.size,1,80),points:stroke.points.map(([x,y])=>[bound(x,0,width),bound(y,0,height)])};
   }
   function interpolatePair(a,b,t){
     if(!a && !b)return [];
@@ -646,10 +726,10 @@
     if(!to){toast('Select a keyframe that has a following frame');return;}
     if(project.frames.length+count>120){toast('Not enough room: maximum 120 frames');return;}
     if(!from.strokes.length&&!to.strokes.length){toast('Draw something in your keyframes first');return;}
-    const curve=curveValues();
+    const ease=$('tweenEase').value;
     const frames=Array.from({length:count},(_,j)=>{
-      const t=bezierAt((j+1)/(count+1),curve);
-      const strokes=[];for(let k=0;k<Math.max(from.strokes.length,to.strokes.length);k++)strokes.push(...interpolatePair(from.strokes[k],to.strokes[k],t));
+      const t=evaluateEase(ease,(j+1)/(count+1));
+      const strokes=[];for(let k=0;k<Math.max(from.strokes.length,to.strokes.length);k++)strokes.push(...interpolatePair(from.strokes[k],to.strokes[k],t).map(normalizeTweenStroke));
       return {id:uid(),strokes};
     });
     const frameIds=frames.map(f=>f.id),afterId=from.id;
@@ -726,12 +806,17 @@
     $('duplicateSelectionBtn').addEventListener('click',duplicateSelection);
     $('deselectBtn').addEventListener('click',()=>{selection=null;updateSelectionUI();renderCanvas()});
     for(const id of ['onionPrev','onionNext'])$(id).addEventListener('change',()=>{onionPrev=Number($('onionPrev').value);onionNext=Number($('onionNext').value);renderCanvas()});
-    $('tweenEase').addEventListener('change',()=>{
-      const curve=curvePresets[$('tweenEase').value];if(curve)['curveX1','curveY1','curveX2','curveY2'].forEach((id,i)=>$(id).value=curve[i]);updateCurve();
-    });
-    for(const id of ['curveX1','curveY1','curveX2','curveY2'])$(id).addEventListener('input',()=>{$('tweenEase').value='custom';updateCurve()});
+    $('tweenEase').addEventListener('change',updateCurve);
     $('tweenBtn').addEventListener('click',generateTweens);updateCurve();updateHistoryUI();
     $('onionToggle').addEventListener('change',e=>{onion=e.target.checked;renderCanvas()});
+    $('canvasSizeToggle').addEventListener('click',()=>{
+      const panel=$('canvasSizePanel'),open=panel.hidden;
+      panel.hidden=!open;$('canvasSizeToggle').setAttribute('aria-expanded',String(open));
+      if(open){renderedCanvasSize='';updateCanvasDimensions();updateCanvasSizeForm();}
+    });
+    document.addEventListener('pointerdown',e=>{
+      if(!$('canvasSizeMenu').contains(e.target))closeCanvasSizePanel();
+    });
     $('canvasPreset').addEventListener('change',updateCanvasSizeForm);
     $('canvasWidth').addEventListener('input',updateCanvasSizeForm);
     $('canvasHeight').addEventListener('input',updateCanvasSizeForm);
@@ -739,7 +824,7 @@
     $('fpsSelect').addEventListener('change',e=>postOp({type:'fps-set',fps:Number(e.target.value)}));
     $('projectTitle').addEventListener('change',e=>postOp({type:'title-set',title:e.target.value}));
     $('projectTitle').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur()});
-    $('inviteBtn').addEventListener('click',copyInvite);$('sideInviteBtn').addEventListener('click',copyInvite);
+    $('inviteBtn').addEventListener('click',copyInvite);
     $('exportBtn').addEventListener('click',exportAnimation);
     $('playBtn').addEventListener('click',togglePlay);
     $('prevFrameBtn').addEventListener('click',()=>goFrame(-1));$('nextFrameBtn').addEventListener('click',()=>goFrame(1));
@@ -749,6 +834,7 @@
     drawCanvas.addEventListener('pointerup',pointerUp);drawCanvas.addEventListener('pointercancel',pointerUp);
     drawCanvas.addEventListener('contextmenu',e=>e.preventDefault());
     document.addEventListener('keydown',e=>{
+      if(e.key==='Escape' && !$('canvasSizePanel').hidden){e.preventDefault();closeCanvasSizePanel();return;}
       if(!project || ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)||$('confirmDialog').open)return;
       if((e.ctrlKey||e.metaKey)&&((e.shiftKey&&e.key.toLowerCase()==='z')||e.key.toLowerCase()==='y')){e.preventDefault();redo();return;}
       if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return;}
@@ -759,7 +845,8 @@
       else if(e.key.toLowerCase()==='e')setTool('eraser');
       else if(e.key.toLowerCase()==='g')setTool('bucket');
       else if(e.key.toLowerCase()==='l')setTool('lasso');
-      else if(e.key==='Escape'){selection=null;updateSelectionUI();renderCanvas()}
+      else if((e.key==='Delete'||e.key==='Backspace')&&selection){e.preventDefault();deleteSelection();}
+      else if(e.key==='Escape'){closeCanvasSizePanel();selection=null;updateSelectionUI();renderCanvas()}
     });
     window.addEventListener('beforeunload',()=>eventSource?.close());
     setBrushSize(8);

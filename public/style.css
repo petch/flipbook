@@ -36,3 +36,19 @@
 .frame-thumb-wrap{display:flex;align-items:center;justify-content:center}
 .frame-thumb-wrap canvas{height:auto;width:auto;max-width:100%;max-height:100%;object-fit:contain;flex:none}
 @media(max-width:680px){.artboard-wrap{width:min(100%,calc(45vh * var(--canvas-aspect,1.77778)))}}
+
+/* v4: canvas size settings live beside the current resolution, not in the sidebar. */
+.workspace-heading{position:relative;z-index:4}
+.canvas-size-menu{position:relative;z-index:5}
+.resolution-button{display:flex;align-items:center;gap:9px;justify-content:space-between;border:1px solid #454a61;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s,border-color .15s}
+.resolution-button:hover,.resolution-button[aria-expanded="true"]{background:#39344d;border-color:#9e88d9;color:#efe9ff}
+.resolution-chevron{font-size:16px;line-height:10px;color:#ae9ce4;transform:translateY(-2px)}
+.canvas-size-popover{position:absolute;top:calc(100% + 9px);right:0;width:min(290px,calc(100vw - 25px));background:#212434;border:1px solid #4e4b66;box-shadow:0 15px 50px #0009;border-radius:12px;padding:19px;z-index:15;color:#b6bad0;text-align:left}
+.canvas-size-popover .canvas-size-hint{margin-bottom:0}
+.canvas-size-popover .canvas-size-label{margin-top:12px}
+.canvas-size-popover[hidden],.canvas-size-fields[hidden]{display:none!important}
+.curve-preview-only{padding:9px;margin-top:10px;max-width:100%;overflow:hidden}
+.curve-preview-only svg{height:110px;display:block}
+.curve-hint{font-size:10px;color:#a29db9;margin:5px 0 1px;overflow-wrap:anywhere}
+#tweenEase{min-width:110px;max-width:145px}
+@media(max-width:680px){.canvas-meta .resolution-button{display:flex;padding:7px 8px;font-size:10px}.canvas-size-popover{right:0}}

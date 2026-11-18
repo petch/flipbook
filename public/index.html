@@ -72,7 +72,7 @@
         <button id="redoBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-redo"/></svg> Redo <kbd>Ctrl Y</kbd></button>
         <button id="importImageBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-image"/></svg> Import image <kbd>PNG, JPG</kbd></button>
         <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
-        <div id="selectionActions" class="selection-actions" hidden><div class="section-label">SELECTION</div><button id="duplicateSelectionBtn" class="sidebar-action">Duplicate selection</button><button id="deleteSelectionBtn" class="sidebar-action">Delete selection</button><button id="deselectBtn" class="sidebar-action">Deselect</button></div>
+        <div id="selectionActions" class="selection-actions" hidden><div class="section-label">SELECTION</div><button id="duplicateSelectionBtn" class="sidebar-action">Duplicate selection</button><button id="deleteSelectionBtn" class="sidebar-action">Delete selection <kbd>Del</kbd></button><button id="deselectBtn" class="sidebar-action">Deselect</button></div>
         <button id="clearFrameBtn" class="sidebar-action"><svg class="ui-icon"><use href="#i-trash"/></svg> Clear frame</button>
         <div class="left-bottom"><div class="hint-icon">✦</div><p>Little strokes make<br />great stories.</p></div>
       </aside>
@@ -80,7 +80,32 @@
       <main class="workspace">
         <div class="workspace-heading">
           <div><div class="section-label">YOUR CANVAS</div><div class="workspace-frame-title">Frame <span id="currentFrameNum">01</span><span class="muted"> / </span><span id="totalFrames">01</span></div></div>
-          <div class="canvas-meta"><span class="canvas-live"><span class="live-dot"></span> Everyone can draw</span><span class="resolution" id="canvasResolution">960 × 540</span></div>
+          <div class="canvas-meta"><span class="canvas-live"><span class="live-dot"></span> Everyone can draw</span>
+            <div class="canvas-size-menu" id="canvasSizeMenu">
+              <button id="canvasSizeToggle" type="button" class="resolution resolution-button" aria-expanded="false" aria-controls="canvasSizePanel" title="Change canvas size"><span id="canvasResolution">960 × 540</span><span class="resolution-chevron" aria-hidden="true">⌄</span></button>
+              <div class="canvas-size-popover" id="canvasSizePanel" hidden>
+                <div class="section-label">CANVAS SIZE</div>
+                <label class="canvas-size-label" for="canvasPreset">Resolution</label>
+                <select id="canvasPreset" class="canvas-preset" aria-label="Canvas size preset">
+                  <option value="960x540">960 × 540 · 16:9</option>
+                  <option value="1280x720">1280 × 720 · HD</option>
+                  <option value="1920x1080">1920 × 1080 · Full HD</option>
+                  <option value="800x600">800 × 600 · 4:3</option>
+                  <option value="800x800">800 × 800 · Square</option>
+                  <option value="1080x1080">1080 × 1080 · Square HD</option>
+                  <option value="720x1280">720 × 1280 · Vertical</option>
+                  <option value="custom">Custom…</option>
+                </select>
+                <div id="customCanvasSize" class="canvas-size-fields" hidden>
+                  <label for="canvasWidth">Width <input id="canvasWidth" type="number" min="128" max="1920" step="1" inputmode="numeric" value="960" /></label>
+                  <span aria-hidden="true">×</span>
+                  <label for="canvasHeight">Height <input id="canvasHeight" type="number" min="128" max="1920" step="1" inputmode="numeric" value="540" /></label>
+                </div>
+                <button id="applyCanvasSize" class="button button-secondary canvas-size-apply" disabled>Apply canvas size</button>
+                <p class="canvas-size-hint">All frames resize together. Artwork is scaled proportionally and synced with collaborators.</p>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="stage" id="stage">
           <div class="stage-ambient"></div>
@@ -100,37 +125,16 @@
       </main>
 
       <aside class="right-sidebar">
-        <div class="section-label">CANVAS SIZE</div>
-        <label class="canvas-size-label" for="canvasPreset">Resolution</label>
-        <select id="canvasPreset" class="canvas-preset" aria-label="Canvas size preset">
-          <option value="960x540">960 × 540 · 16:9</option>
-          <option value="1280x720">1280 × 720 · HD</option>
-          <option value="1920x1080">1920 × 1080 · Full HD</option>
-          <option value="800x600">800 × 600 · 4:3</option>
-          <option value="800x800">800 × 800 · Square</option>
-          <option value="1080x1080">1080 × 1080 · Square HD</option>
-          <option value="720x1280">720 × 1280 · Vertical</option>
-          <option value="custom">Custom…</option>
-        </select>
-        <div id="customCanvasSize" class="canvas-size-fields" hidden>
-          <label for="canvasWidth">Width <input id="canvasWidth" type="number" min="128" max="1920" step="1" inputmode="numeric" value="960" /></label>
-          <span aria-hidden="true">×</span>
-          <label for="canvasHeight">Height <input id="canvasHeight" type="number" min="128" max="1920" step="1" inputmode="numeric" value="540" /></label>
-        </div>
-        <button id="applyCanvasSize" class="button button-secondary canvas-size-apply" disabled>Apply canvas size</button>
-        <p class="canvas-size-hint">All frames resize together. Artwork scales proportionally to fit without stretching. Shared with collaborators.</p>
-        <div class="sidebar-rule"></div>
         <div class="setting-row"><div><div class="setting-name">Onion skin</div><div class="setting-desc">See your previous frame</div></div><label class="switch" title="Show previous frame faintly"><input id="onionToggle" type="checkbox" checked /><span class="switch-track"></span></label></div>
         <div class="onion-controls"><label class="setting-row compact-setting">Previous frames <select id="onionPrev" aria-label="Previous onion frames"><option>0</option><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label><label class="setting-row compact-setting">Next frames <select id="onionNext" aria-label="Next onion frames"><option selected>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
         <div class="sidebar-rule"></div>
         <div class="section-label">SHAPE TWEEN</div>
         <p class="tween-explainer">Draw two keyframes next to each other, then generate smooth in-between frames. Matching strokes morph along an easing curve.</p>
         <label class="setting-row compact-setting">In-between frames <select id="tweenCount"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>12</option></select></label>
-        <label class="setting-row compact-setting">Curve <select id="tweenEase"><option value="linear">Linear</option><option value="ease" selected>Ease in / out</option><option value="easein">Ease in</option><option value="easeout">Ease out</option><option value="custom">Custom Bézier</option></select></label>
-        <div id="curveEditor" class="curve-editor"><svg id="curvePreview" viewBox="0 0 160 100" aria-label="Motion easing curve preview"></svg><label>First handle Y <input id="curveY1" type="range" min="0" max="1" step="0.05" value="0"/></label><label>Second handle Y <input id="curveY2" type="range" min="0" max="1" step="0.05" value="1"/></label><label>First handle X <input id="curveX1" type="range" min="0" max="1" step="0.05" value="0.42"/></label><label>Second handle X <input id="curveX2" type="range" min="0" max="1" step="0.05" value="0.58"/></label></div>
+        <label class="setting-row compact-setting">Ease <select id="tweenEase" aria-label="DOTween ease"><optgroup label="Default"><option value="Unset">Unset (DOTween default)</option><option value="Linear">Linear</option></optgroup><optgroup label="Sine"><option value="InSine">InSine</option><option value="OutSine">OutSine</option><option value="InOutSine">InOutSine</option></optgroup><optgroup label="Quad"><option value="InQuad">InQuad</option><option value="OutQuad">OutQuad</option><option value="InOutQuad" selected>InOutQuad</option></optgroup><optgroup label="Cubic"><option value="InCubic">InCubic</option><option value="OutCubic">OutCubic</option><option value="InOutCubic">InOutCubic</option></optgroup><optgroup label="Quart"><option value="InQuart">InQuart</option><option value="OutQuart">OutQuart</option><option value="InOutQuart">InOutQuart</option></optgroup><optgroup label="Quint"><option value="InQuint">InQuint</option><option value="OutQuint">OutQuint</option><option value="InOutQuint">InOutQuint</option></optgroup><optgroup label="Expo"><option value="InExpo">InExpo</option><option value="OutExpo">OutExpo</option><option value="InOutExpo">InOutExpo</option></optgroup><optgroup label="Circ"><option value="InCirc">InCirc</option><option value="OutCirc">OutCirc</option><option value="InOutCirc">InOutCirc</option></optgroup><optgroup label="Elastic"><option value="InElastic">InElastic</option><option value="OutElastic">OutElastic</option><option value="InOutElastic">InOutElastic</option></optgroup><optgroup label="Back"><option value="InBack">InBack</option><option value="OutBack">OutBack</option><option value="InOutBack">InOutBack</option></optgroup><optgroup label="Bounce"><option value="InBounce">InBounce</option><option value="OutBounce">OutBounce</option><option value="InOutBounce">InOutBounce</option></optgroup><optgroup label="Flash"><option value="Flash">Flash</option><option value="InFlash">InFlash</option><option value="OutFlash">OutFlash</option><option value="InOutFlash">InOutFlash</option></optgroup></select></label>
+        <div id="curveEditor" class="curve-editor curve-preview-only"><svg id="curvePreview" viewBox="0 0 160 100" role="img" aria-label="Selected easing curve preview"></svg><span id="curveHint" class="curve-hint">DOTween easing · default settings</span></div>
         <button id="tweenBtn" class="button button-secondary tween-button">Generate in-betweens</button>
         <div class="sidebar-rule"></div>
-        <div class="invite-card"><div class="invite-card-graphic"><span>✎</span><span>✦</span><span>◡</span></div><div class="invite-card-title">Better together.</div><p>Invite friends to draw in this flipbook with you, in real time.</p><button id="sideInviteBtn">Copy invite link <span>↗</span></button></div>
         <div class="sidebar-footer">MADE FOR CREATIVE MINDS <span>✦</span></div>
       </aside>
     </div>

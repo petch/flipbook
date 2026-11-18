@@ -23,12 +23,12 @@ Open **http://localhost:3000**. Create a project and share its URL. For a differ
 
 ## Canvas size
 
-Choose **Canvas Size** in the right sidebar (presets for landscape, portrait, square, and **Custom**). Custom dimensions range from **128–1920 px** for each side. Click **Apply canvas size**; changing size updates every animation frame for all collaborators. Existing strokes and embedded images are scaled proportionally and centered so changing aspect ratio adds blank margins instead of stretching drawings. This operation intentionally resets local undo/redo history, because prior coordinates no longer match the new canvas. Export sizes follow the chosen project resolution (except GIF and sprite sheets, which scale to a maximum of 480 pixels on their longest side).
+Click the **current resolution** beside the canvas heading (presets for landscape, portrait, square, and **Custom**). Custom dimensions range from **128–1920 px** for each side. Click **Apply canvas size**; changing size updates every animation frame for all collaborators. Existing strokes and embedded images are scaled proportionally and centered so changing aspect ratio adds blank margins instead of stretching drawings. This operation intentionally resets local undo/redo history, because prior coordinates no longer match the new canvas. Export sizes follow the chosen project resolution (except GIF and sprite sheets, which scale to a maximum of 480 pixels on their longest side).
 
 ## Editing features
 
 - Brush (`B`), eraser (`E`), flood-fill bucket (`G`), lasso select/move (`L`)
-- Lasso: draw a closed-looking freehand outline around strokes or imported images; drag the selection to move. Duplicate, delete, and deselect selected items using the left toolbar. A selection moves **whole strokes/images**, not individual pixels within a stroke.
+- Lasso: draw a closed-looking freehand outline around strokes or imported images; drag the selection to move. Duplicate, delete, and deselect selected items using the left toolbar; **Delete/Backspace** removes the selection, and undo restores it. A selection moves **whole strokes/images**, not individual pixels within a stroke.
 - Image import: PNG/JPEG/WebP/GIF (GIF **first frame only**). Images are converted to WebP or PNG, automatically resized and embedded into the shared project. Use Lasso to reposition. Max compressed image data ~1.6 MB.
 - Undo / redo for brush strokes, erasing, fills, imported images, lasso moves, selection edits, frame clear, and tween generation. `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z` or buttons. History is local to the browser session, and collaboration conflicts are still possible for full-frame edits.
 - Touch canvas: **two-finger quick tap = undo**, **three-finger quick tap = redo**. Drag one finger to draw. Gesture recognition requires touches to remain mostly stationary, and browser/OS gestures can interfere.
@@ -37,7 +37,7 @@ Choose **Canvas Size** in the right sidebar (presets for landscape, portrait, sq
 
 ## Shape-tween generator
 
-Draw two **adjacent keyframes** and select the first. Choose number of in-betweens, an easing preset or **Custom Bézier** curve (X1/Y1/X2/Y2 handles), then click **Generate in-betweens**.
+Draw two **adjacent keyframes** and select the first. Choose number of in-betweens, one of the DOTween ease presets (including Sine, Quad, Cubic, Quart, Quint, Expo, Circ, Elastic, Back, Bounce and Flash variants), then click **Generate in-betweens**.
 
 The generator **bakes editable 2D in-between frames** by matching strokes **in drawing order**, resampling vector paths, and blending points, color, and brush size. Imported identical images interpolate position and scale; different images cross-fade. This is **vector shape tweening**, not 3D skeletal blend shapes, automatic object tracking, or live procedural keyframe links. For best results, keep corresponding drawings and stroke order similar in both keyframes. Generated frames can then be edited individually.
 
@@ -62,3 +62,10 @@ Video recordings are made in **real time**, and very short animations repeat to 
 - Server-Sent Events (SSE) broadcast stroke operations and presence; HTTP POST saves operations.
 - Project links grant **full edit access** to anyone who possesses them; no accounts, roles, moderation, rate limits, or storage quotas.
 - Multiple artists editing the same stroke/frame simultaneously can conflict. For a public site, use authenticated access and transactional persistent storage.
+
+## Version 4 UI changes
+
+- Canvas resolution is clickable in the canvas heading; its popover replaces the canvas-size sidebar group.
+- Removed the promotional **Better together.** panel. Share from the top Invite button.
+- Shape tween controls use the full DOTween Ease preset list (35 named curves plus Unset, excluding reserved INTERNAL entries). No custom Bézier handles. Back and Elastic use default DOTween amplitude/overshoot; Flash variants use three flashes.
+- With Lasso active, select whole strokes/imported images, then use Delete or Backspace (or the **Delete selection** button) to remove the selection; Ctrl+Z restores it.
